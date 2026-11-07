@@ -1,0 +1,22 @@
+[project]
+name = "policychecker"
+version = "1.2.0"
+description = "Max-risk security classification for combined datasets, with policy-link checks and an audit trail"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+# Upstream notice from Starlette's test client, not from this project.
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, import order, modern syntax, bugbear, security (bandit)
+select = ["E", "F", "I", "UP", "B", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S104", "S105", "S106"]  # asserts, sample addresses, dummy secrets
