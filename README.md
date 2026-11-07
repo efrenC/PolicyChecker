@@ -13,6 +13,10 @@ It applies the **max-risk (high-water mark) rule**: combined data is classified 
 
 Analytics pipelines and AI agents increasingly pull from several sources at once. Joining a low-sensitivity dataset with a high-sensitivity one silently produces high-sensitivity output, and most pipelines never notice. PolicyChecker makes that step explicit, deterministic, and auditable.
 
+## See it run
+
+[**Execution walkthrough**](https://efrenc.github.io/PolicyChecker/walkthrough.html): one real request traced step by step through the code, with diagrams of the route, the policy-link checks and the max-risk rule. The page lives in [`docs/walkthrough.html`](docs/walkthrough.html).
+
 ## Features
 
 - Validates dataset metadata: name, description, classification, and an HTTPS policy link
