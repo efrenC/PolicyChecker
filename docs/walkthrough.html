@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="One real PolicyChecker request traced step by step through the code: route map, link-check flowchart, max-risk rule and audit log.">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>PolicyChecker Request Trace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a single reading column with a route map up top, then eight numbered steps,
+   each split into explanation (left) and evidence (right: real code + real values). */
+:root {
+  --bg: #F3F5F8; --surface: #FFFFFF; --ink: #17202C; --muted: #576274; --line: #D6DCE4;
+  --accent: #2D5BD7; --accent-soft: #E3EAFB; --code-bg: #EDF0F5;
+  --ok: #1E7A4C; --ok-soft: #DDF1E6; --warn: #A15C00; --warn-soft: #FBEBD3; --crit: #B3261E; --crit-soft: #F9E0DE;
+  --l-public: #5C6B80; --l-public-bg: #E6EAF0; --l-internal: #13756A; --l-internal-bg: #D9F0EC;
+  --l-confidential: #9A5B00; --l-confidential-bg: #F8E9CF; --l-restricted: #A3243B; --l-restricted-bg: #F7DEE3;
+  --hl-kw: #7A3EB8; --hl-str: #1F7346; --hl-com: #6E7787; --hl-num: #A0561A; --hl-title: #2D5BD7; --hl-attr: #2D5BD7;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E131A; --surface: #151C26; --ink: #E5EAF1; --muted: #9AA6B6; --line: #283342;
+  --accent: #86A8FF; --accent-soft: #1D2A47; --code-bg: #111820;
+  --ok: #5BD08F; --ok-soft: #15301F; --warn: #F0AE4E; --warn-soft: #34260F; --crit: #FF8A80; --crit-soft: #3A1A19;
+  --l-public: #A9B6C8; --l-public-bg: #232C38; --l-internal: #4FD1BC; --l-internal-bg: #12302C;
+  --l-confidential: #F2B451; --l-confidential-bg: #33250D; --l-restricted: #FF8FA3; --l-restricted-bg: #3A1821;
+  --hl-kw: #C9A0FF; --hl-str: #8FD9A8; --hl-com: #7E8897; --hl-num: #F5B97A; --hl-title: #8FB1FF; --hl-attr: #8FB1FF;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0E131A; --surface: #151C26; --ink: #E5EAF1; --muted: #9AA6B6; --line: #283342;
+  --accent: #86A8FF; --accent-soft: #1D2A47; --code-bg: #111820;
+  --ok: #5BD08F; --ok-soft: #15301F; --warn: #F0AE4E; --warn-soft: #34260F; --crit: #FF8A80; --crit-soft: #3A1A19;
+  --l-public: #A9B6C8; --l-public-bg: #232C38; --l-internal: #4FD1BC; --l-internal-bg: #12302C;
+  --l-confidential: #F2B451; --l-confidential-bg: #33250D; --l-restricted: #FF8FA3; --l-restricted-bg: #3A1821;
+  --hl-kw: #C9A0FF; --hl-str: #8FD9A8; --hl-com: #7E8897; --hl-num: #F5B97A; --hl-title: #8FB1FF; --hl-attr: #8FB1FF;
+  color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--f-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+code { font-family: var(--f-mono); font-size: .88em; }
+p code, li code, td code, .facts code, summary code { background: var(--code-bg); padding: .08em .35em; border-radius: 3px; overflow-wrap: anywhere; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; letter-spacing: -.01em; line-height: 1.15; margin: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.muted { color: var(--muted); }
+.eyebrow { font: 600 12px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+
+header.mast { background: var(--surface); border-bottom: 1px solid var(--line); }
+header.mast .wrap { padding-block: 40px 32px; display: grid; gap: 14px; }
+header.mast h1 { font-size: clamp(30px, 5vw, 48px); font-weight: 750; font-stretch: 88%; max-width: 20ch; }
+.lede { max-width: 68ch; color: var(--muted); font-size: 17px; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font: 500 13px/1.4 var(--f-mono); color: var(--muted); }
+.meta span::before { content: "▪ "; color: var(--accent); }
+
+section.block { padding-block: 40px 8px; }
+section.block > .wrap > h2 { font-size: 26px; font-weight: 700; font-stretch: 92%; margin-bottom: 6px; }
+.intro { max-width: 70ch; color: var(--muted); margin: 0 0 20px; }
+
+.dcards { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.dcard { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.dc-top { display: flex; justify-content: space-between; align-items: center; }
+.dc-name { font: 650 18px/1.3 var(--f-display); font-stretch: 95%; }
+.dc-name code.ws { white-space: pre; font-size: 15px; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+.dc-desc { color: var(--muted); font-size: 14px; }
+.dc-link { font-size: 12.5px; color: var(--ink); overflow-wrap: anywhere; }
+.dc-note { font-size: 13px; border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 4px; }
+.rank { font: 500 11.5px/1 var(--f-mono); color: var(--muted); letter-spacing: .04em; }
+.lvl { display: inline-block; font: 600 12px/1 var(--f-mono); padding: 5px 8px; border-radius: 4px; letter-spacing: .02em; }
+.lvl-public { color: var(--l-public); background: var(--l-public-bg); }
+.lvl-internal { color: var(--l-internal); background: var(--l-internal-bg); }
+.lvl-confidential { color: var(--l-confidential); background: var(--l-confidential-bg); }
+.lvl-restricted { color: var(--l-restricted); background: var(--l-restricted-bg); }
+.st { display: inline-block; font: 600 12px/1 var(--f-mono); padding: 4px 8px; border-radius: 99px; border: 1px solid currentColor; }
+.st-reachable { color: var(--ok); background: var(--ok-soft); }
+.st-unreachable { color: var(--warn); background: var(--warn-soft); }
+.st-blocked { color: var(--crit); background: var(--crit-soft); }
+.st-not-checked { color: var(--muted); }
+
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; position: relative; }
+.mapbox { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 12px 8px; }
+svg.metro { display: block; width: max(100%, 860px); height: auto; }
+.rail-main { stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+.rail-audit { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 2 5; stroke-linecap: round; }
+.branch { stroke: var(--crit); stroke-width: 2; fill: none; }
+.branch-audit { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.branch-write { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; }
+.audit-dot { fill: var(--muted); } .audit-dot.write { fill: var(--accent); }
+.m-fill { fill: var(--muted); } .m-err { fill: var(--crit); }
+.m-fill-on { fill: var(--accent); }
+.pill-start { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.pill-ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5; }
+.pill-err { fill: var(--crit-soft); stroke: var(--crit); stroke-width: 1.2; }
+.t-pill { font: 600 11.5px var(--f-mono); fill: var(--ink); }
+.t-ok { fill: var(--ok); } .t-err { fill: var(--crit); }
+.t-note { font: 400 11px var(--f-mono); fill: var(--muted); }
+.t-file { font: 500 12px var(--f-mono); fill: var(--muted); }
+.t-station { font: 650 13px var(--f-display); font-stretch: 90%; fill: var(--ink); }
+.t-num { font: 600 11px var(--f-mono); fill: var(--ink); pointer-events: none; }
+.stop { fill: var(--surface); stroke: var(--ink); stroke-width: 2.5; transition: fill .2s, stroke .2s; }
+.station { cursor: pointer; text-decoration: none; }
+.station:hover .stop, .station.current .stop { fill: var(--accent); stroke: var(--accent); }
+.station:hover .t-num, .station.current .t-num { fill: var(--surface); }
+.station.current .t-station { fill: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px; color: var(--muted); padding: 10px 6px 4px; }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+
+nav.stepnav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); margin-top: 32px; }
+nav.stepnav ol { list-style: none; margin: 0 auto; padding: 8px 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+nav.stepnav a { display: flex; align-items: center; gap: 6px; white-space: nowrap; text-decoration: none; color: var(--muted); font: 500 13px/1 var(--f-body); padding: 7px 10px; border-radius: 99px; border: 1px solid transparent; }
+nav.stepnav a b { font: 600 11px/1 var(--f-mono); width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid currentColor; }
+nav.stepnav a[aria-current="step"] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+
+.step { padding-block: 44px; border-bottom: 1px solid var(--line); scroll-margin-top: 64px; }
+.step-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 28px 36px; align-items: start; }
+.step-grid > * { min-width: 0; }
+.step-head { display: grid; gap: 8px; margin-bottom: 12px; }
+.step-num { font: 600 13px/1 var(--f-mono); color: var(--accent); }
+.step h3 { font-size: 28px; font-weight: 720; font-stretch: 90%; }
+.where { font: 500 13px/1.5 var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.explain p { margin: 0 0 12px; max-width: 62ch; }
+.callout { border-left: 3px solid var(--crit); background: var(--crit-soft); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 14.5px; margin-top: 14px; }
+.callout strong { color: var(--crit); }
+.callout.info { border-color: var(--accent); background: var(--accent-soft); }
+.callout.info strong { color: var(--accent); }
+.evidence { display: grid; gap: 14px; }
+figure.code { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+figure.code figcaption { display: flex; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); font: 500 12px/1.3 var(--f-mono); color: var(--muted); }
+figure.code .file { color: var(--ink); }
+figure.code pre { margin: 0; padding: 14px; overflow-x: auto; font: 400 12.8px/1.6 var(--f-mono); tab-size: 4; }
+figure.code pre code { font-size: inherit; background: none; padding: 0; color: var(--ink); }
+.hljs-keyword, .hljs-built_in, .hljs-literal { color: var(--hl-kw); }
+.hljs-string { color: var(--hl-str); } .hljs-comment { color: var(--hl-com); font-style: italic; }
+.hljs-number { color: var(--hl-num); } .hljs-title, .hljs-title.function_, .hljs-title.class_ { color: var(--hl-title); }
+.hljs-attr, .hljs-meta { color: var(--hl-attr); } .hljs-subst { color: var(--ink); }
+.facts { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.facts h4 { margin: 0 0 8px; font: 600 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.facts dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: 14.5px; }
+.facts dt { color: var(--muted); } .facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts ul { margin: 0; padding-left: 18px; font-size: 14.5px; } .facts li { margin: 3px 0; }
+.diff { font: 500 13px/1.6 var(--f-mono); }
+.diff del { color: var(--crit); text-decoration: none; background: var(--crit-soft); padding: 0 4px; border-radius: 3px; white-space: pre; }
+.diff ins { color: var(--ok); text-decoration: none; background: var(--ok-soft); padding: 0 4px; border-radius: 3px; }
+
+.flowwrap { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+svg.flow { display: block; width: max(100%, 560px); height: auto; }
+.node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; transition: stroke .2s, fill .2s; }
+.node text { font: 500 14.5px var(--f-body); fill: var(--ink); }
+.n-q rect { stroke-dasharray: 5 3; stroke: var(--muted); }
+.n-start rect { stroke: var(--ink); }
+.n-blocked rect { fill: var(--crit-soft); stroke: var(--crit); } .n-blocked text { fill: var(--crit); font-family: var(--f-mono); font-size: 13px; font-weight: 600; }
+.n-unreachable rect { fill: var(--warn-soft); stroke: var(--warn); } .n-unreachable text { fill: var(--warn); font-family: var(--f-mono); font-size: 13px; font-weight: 600; }
+.n-reachable rect { fill: var(--ok-soft); stroke: var(--ok); } .n-reachable text { fill: var(--ok); font-family: var(--f-mono); font-size: 13px; font-weight: 600; }
+.edge { stroke: var(--muted); stroke-width: 1.5; fill: none; transition: stroke .2s, stroke-width .2s; }
+.t-yn { font: 500 12px var(--f-mono); fill: var(--muted); }
+svg.flow.tracing .node:not(.on) { opacity: .38; }
+svg.flow.tracing .edge:not(.on) { opacity: .28; }
+svg.flow .node.on rect { stroke: var(--accent); stroke-width: 2.5; }
+svg.flow .edge.on { stroke: var(--accent); stroke-width: 3; marker-end: url(#fa-on); }
+.linkcards { display: grid; gap: 10px; }
+.linkcard { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.linkcard.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.lc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.trace-btn { font: 600 12px/1 var(--f-mono); padding: 6px 10px; border-radius: 99px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+.trace-btn[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.hops { list-style: none; margin: 0; padding: 0 0 0 4px; display: grid; gap: 5px; font-size: 13.5px; }
+.hop { position: relative; padding-left: 20px; overflow-wrap: anywhere; }
+.hop::before { content: ""; position: absolute; left: 3px; top: .55em; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--muted); }
+.hop-http::before { border-color: var(--accent); background: var(--accent); }
+.hop-stop::before { border-color: var(--crit); background: var(--crit); }
+.hop-end::before { border-color: var(--ink); background: var(--ink); }
+.hop code { font-size: 12px; }
+
+.ladder { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: end; }
+.rung { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; align-content: start; }
+.rung:nth-child(1) { min-height: 120px; } .rung:nth-child(2) { min-height: 150px; } .rung:nth-child(3) { min-height: 180px; } .rung:nth-child(4) { min-height: 210px; }
+.rung-head { display: grid; gap: 6px; justify-items: start; }
+.rung ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13.5px; font-weight: 500; }
+.rung li { background: var(--bg); border-radius: 4px; padding: 4px 6px; overflow-wrap: anywhere; }
+.rung li.empty { background: none; color: var(--muted); font-weight: 400; font-style: italic; padding: 0; }
+.rung.win { border: 2px solid var(--l-restricted); }
+.verdict { font: 600 11.5px/1.3 var(--f-mono); color: var(--l-restricted); }
+
+.stategrid { display: grid; gap: 4px; min-width: 760px; font-size: 13px; }
+.sg-row { display: grid; grid-template-columns: 170px repeat(5, minmax(0, 1fr)); gap: 4px; }
+.sg-row > div { padding: 8px 10px; border-radius: 4px; min-width: 0; overflow-wrap: anywhere; }
+.sg-head > div { font-weight: 600; color: var(--muted); padding-block: 4px; }
+.sg-head code { font-size: 11.5px; }
+[role="rowheader"] { display: grid; gap: 2px; } [role="rowheader"] code { font-size: 11px; color: var(--muted); }
+.has { background: var(--surface); border: 1px solid var(--line); }
+.new { background: var(--accent-soft); border: 1px solid var(--accent); color: var(--ink); font-weight: 600; }
+.none { border: 1px dashed var(--line); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.rejects { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+.rcard { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.rcode { font: 700 28px/1 var(--f-display); font-stretch: 85%; color: var(--crit); }
+.rcard h3 { font-size: 17px; font-weight: 650; }
+.rcard p { margin: 0; font-size: 14.5px; }
+.rcard .tag { font: 600 11.5px/1 var(--f-mono); justify-self: start; padding: 4px 8px; border-radius: 4px; background: var(--bg); color: var(--muted); }
+.rcard .tag.yes { color: var(--accent); background: var(--accent-soft); }
+.rcard blockquote { margin: 0; font: 400 12.5px/1.5 var(--f-mono); background: var(--code-bg); padding: 8px 10px; border-radius: 4px; overflow-wrap: anywhere; }
+
+.aline { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
+.aline summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 14px; cursor: pointer; font-size: 14px; }
+.aline summary::-webkit-details-marker { display: none; }
+.aline summary::before { content: "▸"; color: var(--muted); } .aline[open] summary::before { content: "▾"; }
+.aline pre { margin: 0; padding: 12px 14px; border-top: 1px solid var(--line); background: var(--code-bg); overflow-x: auto; font: 400 12px/1.55 var(--f-mono); max-height: 360px; }
+.aline pre code { background: none; padding: 0; }
+.ao { font: 600 11.5px/1 var(--f-mono); padding: 4px 8px; border-radius: 4px; }
+.ao-classified { color: var(--ok); background: var(--ok-soft); } .ao-rejected { color: var(--crit); background: var(--crit-soft); }
+.aid { font-size: 12px; color: var(--muted); } .asum { min-width: 0; overflow-wrap: anywhere; }
+
+footer { padding-block: 36px 56px; color: var(--muted); font-size: 14px; }
+footer p { max-width: 75ch; }
+
+@media (max-width: 860px) {
+  .step-grid { grid-template-columns: minmax(0, 1fr); }
+  .ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rung:nth-child(n) { min-height: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+<header class="mast"><div class="wrap">
+  <span class="eyebrow">PolicyChecker · execution walkthrough</span>
+  <h1>One request, traced through the code</h1>
+  <p class="lede">A single <code>POST /classify</code> call, followed from the moment it reaches the server to the JSON that comes back. Every code excerpt is copied from the repository, and every value comes from an actual run.</p>
+  <div class="meta"><span>Traced 2026-11-07</span><span>Python 3.13</span><span>8 steps, 6 source files</span><span>Result: Restricted</span></div>
+</div></header>
+
+<section class="block" aria-labelledby="req-h"><div class="wrap">
+  <h2 id="req-h">The request</h2>
+  <p class="intro">Three datasets someone wants to combine. Each one was chosen to exercise a different path through the code.</p>
+  <ul class="dcards"><li class="dcard"><div class="dc-top"><span class="lvl lvl-internal">Internal</span><span class="rank">rank 2</span></div><strong class="dc-name"><code class="ws">"  Store footfall  "</code></strong><span class="dc-desc">Aggregated visitor counts by store and hour</span><code class="dc-link">https://policies.example.com/footfall</code><span class="dc-note">Sent with spaces around the name, to show trimming.</span></li><li class="dcard"><div class="dc-top"><span class="lvl lvl-restricted">Restricted</span><span class="rank">rank 4</span></div><strong class="dc-name">Loyalty members</strong><span class="dc-desc">Customer names, emails and purchase history</span><code class="dc-link">https://policies.example.com/loyalty</code><span class="dc-note">Its policy page redirects once.</span></li><li class="dcard"><div class="dc-top"><span class="lvl lvl-confidential">Confidential</span><span class="rank">rank 3</span></div><strong class="dc-name">Vendor master</strong><span class="dc-desc">Supplier contacts and payment terms</span><code class="dc-link">https://10.0.0.5/vendor-policy</code><span class="dc-note">Its policy link points at a private network address.</span></li></ul>
+  <details class="aline" style="margin-top:14px"><summary><span class="ao" style="color:var(--accent);background:var(--accent-soft)">JSON</span><span class="asum">Full request body, 557 bytes</span></summary>
+  <pre><code class="language-json">{
+  &quot;Datasets&quot;: [
+    {
+      &quot;Name&quot;: &quot;  Store footfall  &quot;,
+      &quot;Description&quot;: &quot;Aggregated visitor counts by store and hour&quot;,
+      &quot;SecurityClassification&quot;: &quot;Internal&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/footfall&quot;
+    },
+    {
+      &quot;Name&quot;: &quot;Loyalty members&quot;,
+      &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+      &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+    },
+    {
+      &quot;Name&quot;: &quot;Vendor master&quot;,
+      &quot;Description&quot;: &quot;Supplier contacts and payment terms&quot;,
+      &quot;SecurityClassification&quot;: &quot;Confidential&quot;,
+      &quot;PolicyLink&quot;: &quot;https://10.0.0.5/vendor-policy&quot;
+    }
+  ]
+}</code></pre></details>
+</div></section>
+
+<section class="block" aria-labelledby="route-h"><div class="wrap">
+  <h2 id="route-h">The route</h2>
+  <p class="intro">The request passes eight stops. Three of them can turn it away early, and every outcome except an unexpected crash ends up in the audit log. Select a stop to jump to it.</p>
+  <div class="mapbox"><div class="scroll-x"><svg class="metro" viewBox="0 0 1010 290" role="img" aria-labelledby="metro-t metro-d">
+<title id="metro-t">Route of a request through PolicyChecker</title>
+<desc id="metro-d">Eight steps from the incoming POST /classify request to a 200 response, with exits for 413, 422, 500 and 400 errors, and the audit log collecting rejections and decisions.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="m-fill"/></marker><marker id="ah-err" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="m-err"/></marker></defs>
+<line x1="120" y1="246" x2="780" y2="246" class="rail-audit"/>
+<text x="792" y="250" class="t-file">audit_log.jsonl</text>
+<line x1="104" y1="84" x2="928" y2="84" class="rail-main"/>
+<rect x="2" y="70" width="102" height="28" rx="14" class="pill-start"/><text x="53" y="88" text-anchor="middle" class="t-pill">POST /classify</text>
+<rect x="930" y="70" width="72" height="28" rx="14" class="pill-ok"/><text x="966" y="88" text-anchor="middle" class="t-pill t-ok">200 OK</text>
+<line x1="120" y1="95" x2="120" y2="152" class="branch" marker-end="url(#ah-err)"/>
+<rect x="74" y="154" width="92" height="28" rx="6" class="pill-err"/><text x="120" y="172" text-anchor="middle" class="t-pill t-err">413 Too large</text>
+<line x1="120" y1="182" x2="120" y2="246" class="branch-audit"/><circle cx="120" cy="246" r="4" class="audit-dot"/>
+<line x1="230" y1="95" x2="230" y2="152" class="branch" marker-end="url(#ah-err)"/>
+<rect x="184" y="154" width="92" height="28" rx="6" class="pill-err"/><text x="230" y="172" text-anchor="middle" class="t-pill t-err">422 Invalid</text>
+<line x1="230" y1="182" x2="230" y2="246" class="branch-audit"/><circle cx="230" cy="246" r="4" class="audit-dot"/>
+<line x1="340" y1="95" x2="340" y2="152" class="branch" marker-end="url(#ah-err)"/>
+<rect x="294" y="154" width="92" height="28" rx="6" class="pill-err"/><text x="340" y="172" text-anchor="middle" class="t-pill t-err">500 Error</text>
+<text x="340" y="200" text-anchor="middle" class="t-note">not audited</text>
+<line x1="450" y1="95" x2="450" y2="152" class="branch" marker-end="url(#ah-err)"/>
+<rect x="404" y="154" width="92" height="28" rx="6" class="pill-err"/><text x="450" y="172" text-anchor="middle" class="t-pill t-err">400 Rejected</text>
+<line x1="450" y1="182" x2="450" y2="246" class="branch-audit"/><circle cx="450" cy="246" r="4" class="audit-dot"/>
+<line x1="780" y1="95" x2="780" y2="246" class="branch-write"/><circle cx="780" cy="246" r="4" class="audit-dot write"/>
+<a href="#step-1" class="station" data-step="1"><g><text x="120" y="60" text-anchor="middle" class="t-station">Guard</text><circle cx="120" cy="84" r="11" class="stop"/><text x="120" y="88" text-anchor="middle" class="t-num">1</text></g></a>
+<a href="#step-2" class="station" data-step="2"><g><text x="230" y="60" text-anchor="middle" class="t-station">Validate input</text><circle cx="230" cy="84" r="11" class="stop"/><text x="230" y="88" text-anchor="middle" class="t-num">2</text></g></a>
+<a href="#step-3" class="station" data-step="3"><g><text x="340" y="60" text-anchor="middle" class="t-station">Hand-off</text><circle cx="340" cy="84" r="11" class="stop"/><text x="340" y="88" text-anchor="middle" class="t-num">3</text></g></a>
+<a href="#step-4" class="station" data-step="4"><g><text x="450" y="60" text-anchor="middle" class="t-station">Re-validate</text><circle cx="450" cy="84" r="11" class="stop"/><text x="450" y="88" text-anchor="middle" class="t-num">4</text></g></a>
+<a href="#step-5" class="station" data-step="5"><g><text x="560" y="60" text-anchor="middle" class="t-station">Check links</text><circle cx="560" cy="84" r="11" class="stop"/><text x="560" y="88" text-anchor="middle" class="t-num">5</text></g></a>
+<a href="#step-6" class="station" data-step="6"><g><text x="670" y="60" text-anchor="middle" class="t-station">Apply max risk</text><circle cx="670" cy="84" r="11" class="stop"/><text x="670" y="88" text-anchor="middle" class="t-num">6</text></g></a>
+<a href="#step-7" class="station" data-step="7"><g><text x="780" y="60" text-anchor="middle" class="t-station">Write audit</text><circle cx="780" cy="84" r="11" class="stop"/><text x="780" y="88" text-anchor="middle" class="t-num">7</text></g></a>
+<a href="#step-8" class="station" data-step="8"><g><text x="890" y="60" text-anchor="middle" class="t-station">Respond</text><circle cx="890" cy="84" r="11" class="stop"/><text x="890" y="88" text-anchor="middle" class="t-num">8</text></g></a>
+</svg></div>
+  <div class="legend"><span><i style="border-color:var(--ink)"></i>Normal path</span><span><i style="border-color:var(--crit)"></i>Early exit (error response)</span><span><i style="border-color:var(--muted);border-top-style:dashed"></i>Recorded in the audit log</span></div></div>
+</div></section>
+
+<nav class="stepnav" aria-label="Steps"><div class="wrap"><ol>
+<li><a href="#step-1" data-step="1"><b>1</b>Guard</a></li><li><a href="#step-2" data-step="2"><b>2</b>Validate input</a></li><li><a href="#step-3" data-step="3"><b>3</b>Hand-off</a></li><li><a href="#step-4" data-step="4"><b>4</b>Re-validate</a></li><li><a href="#step-5" data-step="5"><b>5</b>Check links</a></li><li><a href="#step-6" data-step="6"><b>6</b>Apply max risk</a></li><li><a href="#step-7" data-step="7"><b>7</b>Write audit</a></li><li><a href="#step-8" data-step="8"><b>8</b>Respond</a></li>
+</ol></div></nav>
+
+<main>
+<section class="step" id="step-1"><div class="wrap step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 1 of 8</span><h3>Guard the door</h3><span class="where">app.py · GuardMiddleware</span></div>
+    <p>Before FastAPI sees anything, a small piece of middleware checks the size of the request body. The limit is 16 KB, which is far more than four datasets need.</p>
+    <p>If the client declares a size, that number is checked first. If it doesn't, the body is read in chunks and counted as it arrives, so a client can't get around the limit by leaving the size out. The body is then replayed to FastAPI unchanged.</p>
+    <p>The same middleware adds two security headers to every response on the way back out.</p>
+    <div class="callout"><strong>Turned away here:</strong> bodies over 16 KB get <code>413</code> and an audit entry. The oversized body itself is never stored.</div>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">app.py</span><span class="lines">lines 50–65</span></figcaption><pre><code class="language-python">declared = dict(scope.get(&quot;headers&quot;, [])).get(b&quot;content-length&quot;)
+if declared is not None and (not declared.isdigit() or int(declared) &gt; self.max_bytes):
+    await self._reject(scope, receive, send_with_headers, declared.decode(errors=&quot;replace&quot;))
+    return
+
+body = b&quot;&quot;
+while True:
+    message = await receive()
+    if message[&quot;type&quot;] == &quot;http.disconnect&quot;:
+        return
+    body += message.get(&quot;body&quot;, b&quot;&quot;)
+    if len(body) &gt; self.max_bytes:
+        await self._reject(scope, receive, send_with_headers, f&quot;&gt;{self.max_bytes}&quot;)
+        return
+    if not message.get(&quot;more_body&quot;, False):
+        break</code></pre></figure>
+    <div class="facts"><h4>In this request</h4><dl>
+      <dt>Body size</dt><dd>557 bytes of 16,384 allowed</dd>
+      <dt>Decision</dt><dd>passed to FastAPI</dd>
+      <dt>Headers added</dt><dd><code>x-content-type-options: nosniff</code><br><code>cache-control: no-store</code></dd>
+    </dl></div>
+  </div>
+</div></section>
+
+<section class="step" id="step-2"><div class="wrap step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 2 of 8</span><h3>Validate the input</h3><span class="where">models.py · ClassificationRequest, Dataset</span></div>
+    <p>FastAPI parses the JSON into the Pydantic models. The models are strict, and they check everything about the shape of the request in one pass:</p>
+    <p>between 2 and 4 datasets; a name and description that aren't blank once spaces are trimmed, and aren't too long; one of the four known levels; a policy link that is a valid URL and uses HTTPS; and no fields the service doesn't recognise.</p>
+    <p>Pydantic collects every problem it finds, so the caller sees all of them at once instead of fixing one per attempt.</p>
+    <div class="callout"><strong>Turned away here:</strong> anything that fails returns <code>422</code> with the full list of problems and an audit entry (<code>app.py · audit_invalid_request</code>).</div>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">models.py</span><span class="lines">lines 11–43</span></figcaption><pre><code class="language-python"># Leading/trailing spaces are removed, so a name of only spaces is rejected.
+NameText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=config.MAX_NAME_LENGTH)
+]
+DescriptionText = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=config.MAX_DESCRIPTION_LENGTH
+    ),
+]
+
+
+class StrictModel(BaseModel):
+    # Unknown fields are rejected rather than silently ignored.
+    model_config = ConfigDict(extra=&quot;forbid&quot;)
+
+
+class Dataset(StrictModel):
+    Name: NameText
+    Description: DescriptionText
+    SecurityClassification: SecurityLevel
+    PolicyLink: HttpUrl
+
+    @field_validator(&quot;PolicyLink&quot;)
+    @classmethod
+    def require_https(cls, v: HttpUrl) -&gt; HttpUrl:
+        if v.scheme != &quot;https&quot;:
+            raise ValueError(&quot;PolicyLink must use HTTPS&quot;)
+        return v
+
+
+class ClassificationRequest(StrictModel):
+    Datasets: list[Dataset] = Field(min_length=config.MIN_DATASETS, max_length=config.MAX_DATASETS)</code></pre></figure>
+    <div class="facts"><h4>In this request</h4><dl>
+      <dt>Datasets</dt><dd>3, within the 2–4 limit</dd>
+      <dt>Trimmed name</dt><dd class="diff"><del>"  Store footfall  "</del> → <ins>"Store footfall"</ins></dd>
+      <dt>Levels</dt><dd><span class="lvl lvl-internal">Internal</span> <span class="lvl lvl-restricted">Restricted</span> <span class="lvl lvl-confidential">Confidential</span></dd>
+      <dt>Links</dt><dd>all HTTPS</dd>
+    </dl></div>
+  </div>
+</div></section>
+
+<section class="step" id="step-3"><div class="wrap step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 3 of 8</span><h3>Hand off to the pipeline</h3><span class="where">app.py · classify_datasets</span></div>
+    <p>The endpoint itself is short. It converts the validated models back into plain dictionaries, calls the pipeline, and translates the outcome into an HTTP response.</p>
+    <p><code>mode="json"</code> matters here: it turns Pydantic's URL objects back into plain text. Leaving it out is what made every request fail with a 500 in the original version of this code.</p>
+    <div class="callout"><strong>Two ways out:</strong> a <code>ClassificationRejected</code> from the pipeline becomes <code>400</code>, already audited. Any other error is logged for the operator and the caller gets a generic <code>500</code> with no internal details. A crash is the one outcome that doesn't get an audit entry.</div>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">app.py</span><span class="lines">lines 116–128</span></figcaption><pre><code class="language-python">def classify_datasets(request: ClassificationRequest) -&gt; Any:
+    # mode=&quot;json&quot; turns URL objects into plain strings for the pipeline.
+    datasets = [ds.model_dump(mode=&quot;json&quot;) for ds in request.Datasets]
+    try:
+        result = run_classification_graph(datasets)
+    except ClassificationRejected as exc:
+        return JSONResponse(
+            status_code=400, content={&quot;detail&quot;: exc.errors, &quot;AuditLogId&quot;: exc.audit_log_id}
+        )
+    except Exception as exc:
+        logger.exception(&quot;Unexpected error during classification&quot;)
+        raise HTTPException(status_code=500, detail=&quot;Internal server error&quot;) from exc
+    return ClassificationResponse(**result)</code></pre></figure>
+  </div>
+</div></section>
+
+<section class="step" id="step-4"><div class="wrap step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 4 of 8</span><h3>Re-validate inside the pipeline</h3><span class="where">classification_graph.py · validate_datasets</span></div>
+    <p>The pipeline runs the business rules again. Through the API this is redundant, because step 2 already caught everything. It's there because the pipeline can also be called directly, by a batch job or another agent, without the API in front of it.</p>
+    <p>The pipeline keeps its working data in one dictionary, <code>ClassificationState</code>. Each step reads it, adds one key, and passes it on. This step adds <code>validation</code>.</p>
+    <div class="callout"><strong>Turned away here:</strong> failures are written to the audit log with stage <code>pipeline</code>, then raised as <code>ClassificationRejected</code>, which step 3 turns into a <code>400</code>.</div>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">classification_graph.py</span><span class="lines">lines 85–107</span></figcaption><pre><code class="language-python">for idx, ds in enumerate(state.datasets):
+    prefix = f&quot;Dataset[{idx}]&quot;
+
+    if _blank(ds.get(&quot;Name&quot;)):
+        errors.append(f&quot;{prefix}: Name is required.&quot;)
+
+    if _blank(ds.get(&quot;Description&quot;)):
+        errors.append(f&quot;{prefix}: Description is required.&quot;)
+
+    sc = ds.get(&quot;SecurityClassification&quot;)
+    if sc not in VALID_CLASSES:
+        errors.append(
+            f&quot;{prefix}: Invalid SecurityClassification &#x27;{sc}&#x27;. Allowed: {list(SECURITY_ORDER)}&quot;
+        )
+
+    link = ds.get(&quot;PolicyLink&quot;)
+    if not isinstance(link, str) or not HTTPS_PATTERN.match(link):
+        errors.append(f&quot;{prefix}: PolicyLink must be a non-empty HTTPS URL.&quot;)
+
+state[&quot;validation&quot;] = {&quot;is_valid&quot;: not errors, &quot;errors&quot;: errors}
+
+if errors:
+    raise ValueError(errors)</code></pre></figure>
+    <div class="facts"><h4>In this request</h4><dl>
+      <dt>State added</dt><dd><code>validation = {&quot;is_valid&quot;: true, &quot;errors&quot;: []}</code></dd>
+    </dl></div>
+  </div>
+</div></section>
+
+<section class="step" id="step-5"><div class="wrap">
+  <div class="step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 5 of 8</span><h3>Check every policy link</h3><span class="where">classification_graph.py · check_policy_links<br>link_checker.py · http_link_checker</span></div>
+    <p>Each dataset's policy link is checked to confirm it actually leads somewhere. All the links are checked at the same time on separate threads, so three slow sites cost one timeout, not three.</p>
+    <p>This is also where the service could be abused. It fetches addresses supplied by callers, so a caller could point it at an internal system. The checker therefore vets every address before connecting, and does it again after every redirect.</p>
+    <p>A failed or blocked link doesn't stop the request. It's reported in the response, and the classification still goes ahead.</p>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">link_checker.py</span><span class="lines">lines 74–94</span></figcaption><pre><code class="language-python">for _ in range(config.MAX_REDIRECTS + 1):
+    reason = blocked_reason(url)
+    if reason == UNRESOLVABLE:  # a broken link, not a security refusal
+        return _result(&quot;unreachable&quot;, error=reason)
+    if reason:
+        return _result(&quot;blocked&quot;, error=reason)
+
+    response = client.head(url)
+    if response.status_code in (405, 501):  # HEAD not supported
+        with client.stream(&quot;GET&quot;, url) as streamed:  # headers only
+            response = streamed
+
+    if response.is_redirect and &quot;location&quot; in response.headers:
+        url = url.join(response.headers[&quot;location&quot;])
+        continue
+
+    if response.status_code &lt; 400:
+        return _result(&quot;reachable&quot;, response.status_code)
+    return _result(&quot;unreachable&quot;, response.status_code)
+
+return _result(&quot;unreachable&quot;, error=&quot;Too many redirects&quot;)</code></pre></figure>
+  </div>
+  </div>
+  <div class="step-grid" style="margin-top:28px">
+    <div class="evidence">
+      <div class="facts"><h4>In this request: select a link to trace its path</h4><div class="linkcards"><div class="linkcard" data-key="f"><div class="lc-head"><button type="button" class="trace-btn" id="trace-f" data-trace="f" aria-pressed="false">Show path</button><strong>Store footfall</strong></div><ol class="hops"><li class="hop hop-check">HTTPS, host <code>policies.example.com</code></li><li class="hop hop-check">resolves to <code>93.184.215.14</code>: public</li><li class="hop hop-http"><code>HEAD https://policies.example.com/footfall</code> → 200</li><li class="hop hop-end"><span class="st st-reachable">reachable</span></li></ol></div><div class="linkcard" data-key="l"><div class="lc-head"><button type="button" class="trace-btn" id="trace-l" data-trace="l" aria-pressed="false">Show path</button><strong>Loyalty members</strong></div><ol class="hops"><li class="hop hop-check">HTTPS, host <code>policies.example.com</code></li><li class="hop hop-check">resolves to <code>93.184.215.14</code>: public</li><li class="hop hop-http"><code>HEAD https://policies.example.com/loyalty</code> → 301, redirect to <code>https://docs.example.com/policies/loyalty</code></li><li class="hop hop-check">hop 1: HTTPS, host <code>docs.example.com</code> resolves to <code>93.184.215.20</code>: public</li><li class="hop hop-http"><code>HEAD https://docs.example.com/policies/loyalty</code> → 200</li><li class="hop hop-end"><span class="st st-reachable">reachable</span></li></ol></div><div class="linkcard" data-key="v"><div class="lc-head"><button type="button" class="trace-btn" id="trace-v" data-trace="v" aria-pressed="false">Show path</button><strong>Vendor master</strong></div><ol class="hops"><li class="hop hop-check">HTTPS, host <code>10.0.0.5</code></li><li class="hop hop-stop">resolves to <code>10.0.0.5</code>: private network</li><li class="hop hop-end"><span class="st st-blocked">blocked</span> <span class="muted">no request was sent</span></li></ol></div></div></div>
+      <div class="facts"><h4>Summary added to state</h4><dl>
+        <dt>Results</dt><dd><span class="st st-reachable">reachable</span> <span class="st st-reachable">reachable</span> <span class="st st-blocked">blocked</span></dd>
+        <dt><code>all_reachable</code></dt><dd><code>false</code>, because one link was blocked</dd>
+      </dl></div>
+    </div>
+    <div class="flowwrap"><div class="scroll-x"><svg class="flow" viewBox="0 0 780 640" role="img" aria-labelledby="flow-t flow-d">
+<title id="flow-t">How one policy link is checked</title>
+<desc id="flow-d">Decision flow inside http_link_checker: HTTPS check, address lookup, public-address check, HEAD request, GET fallback, redirect loop of up to three hops, and the final status check.</desc>
+<defs><marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="m-fill"/></marker><marker id="fa-on" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="m-fill-on"/></marker></defs>
+<path d="M250,56 V84" class="edge" data-p="f l v" marker-end="url(#fa)"/>
+<path d="M250,126 V154" class="edge" data-p="f l v" marker-end="url(#fa)"/><text x="258" y="144" class="t-yn" text-anchor="start">yes</text>
+<path d="M250,196 V224" class="edge" data-p="f l v" marker-end="url(#fa)"/>
+<path d="M250,266 V294" class="edge" data-p="f l" marker-end="url(#fa)"/><text x="258" y="284" class="t-yn" text-anchor="start">yes</text>
+<path d="M250,336 V364" class="edge" data-p="f l" marker-end="url(#fa)"/>
+<path d="M250,406 V434" class="edge" data-p="f l" marker-end="url(#fa)"/><text x="258" y="424" class="t-yn" text-anchor="start">no</text>
+<path d="M250,476 V504" class="edge" data-p="f l" marker-end="url(#fa)"/><text x="258" y="494" class="t-yn" text-anchor="start">no</text>
+<path d="M250,546 V574" class="edge" data-p="f l" marker-end="url(#fa)"/><text x="258" y="564" class="t-yn" text-anchor="start">yes</text>
+<path d="M355.0,106.0 H478.0" class="edge" data-p="" marker-end="url(#fa)"/><text x="365.0" y="99.0" class="t-yn" text-anchor="start">no</text>
+<path d="M355.0,176.0 H478.0" class="edge" data-p="" marker-end="url(#fa)"/><text x="365.0" y="169.0" class="t-yn" text-anchor="start">fails</text>
+<path d="M355.0,246.0 H478.0" class="edge" data-p="v" marker-end="url(#fa)"/><text x="365.0" y="239.0" class="t-yn" text-anchor="start">no</text>
+<path d="M355.0,386.0 H478.0" class="edge" data-p="" marker-end="url(#fa)"/><text x="365.0" y="379.0" class="t-yn" text-anchor="start">yes</text>
+<path d="M355.0,526.0 H478.0" class="edge" data-p="" marker-end="url(#fa)"/><text x="365.0" y="519.0" class="t-yn" text-anchor="start">no</text>
+<path d="M575,404 V456 H357.0" class="edge" data-p="" marker-end="url(#fa)"/>
+<path d="M145.0,456 H62 V106 H143.0" class="edge" data-p="l" marker-end="url(#fa)"/>
+<text x="48" y="290" class="t-yn" text-anchor="middle" transform="rotate(-90 48 290)">yes: follow it, then re-check (max 3 hops)</text>
+<g class="node n-start" data-p="f l v"><rect x="145.0" y="20" width="210" height="36" rx="18"/><text x="250" y="43.0" text-anchor="middle">Policy link URL</text></g>
+<g class="node n-q" data-p="f l v"><rect x="145.0" y="86" width="210" height="40" rx="12"/><text x="250" y="111.0" text-anchor="middle">Uses HTTPS?</text></g>
+<g class="node n-do" data-p="f l v"><rect x="145.0" y="156" width="210" height="40" rx="4"/><text x="250" y="181.0" text-anchor="middle">Look up host addresses</text></g>
+<g class="node n-q" data-p="f l v"><rect x="145.0" y="226" width="210" height="40" rx="12"/><text x="250" y="251.0" text-anchor="middle">Every address public?</text></g>
+<g class="node n-do" data-p="f l"><rect x="145.0" y="296" width="210" height="40" rx="4"/><text x="250" y="321.0" text-anchor="middle">Send HEAD request</text></g>
+<g class="node n-q" data-p="f l"><rect x="145.0" y="366" width="210" height="40" rx="12"/><text x="250" y="391.0" text-anchor="middle">Got 405 or 501?</text></g>
+<g class="node n-q" data-p="f l"><rect x="145.0" y="436" width="210" height="40" rx="12"/><text x="250" y="461.0" text-anchor="middle">Is it a redirect?</text></g>
+<g class="node n-q" data-p="f l"><rect x="145.0" y="506" width="210" height="40" rx="12"/><text x="250" y="531.0" text-anchor="middle">Status below 400?</text></g>
+<g class="node n-blocked" data-p=""><rect x="480.0" y="88" width="190" height="36" rx="18"/><text x="575" y="111" text-anchor="middle">blocked: not HTTPS</text></g>
+<g class="node n-unreachable" data-p=""><rect x="480.0" y="158" width="190" height="36" rx="18"/><text x="575" y="181" text-anchor="middle">unreachable: no such host</text></g>
+<g class="node n-blocked" data-p="v"><rect x="480.0" y="228" width="190" height="36" rx="18"/><text x="575" y="251" text-anchor="middle">blocked: private address</text></g>
+<g class="node n-do" data-p=""><rect x="480.0" y="368" width="190" height="36" rx="4"/><text x="575" y="391" text-anchor="middle">GET, headers only</text></g>
+<g class="node n-unreachable" data-p=""><rect x="480.0" y="508" width="190" height="36" rx="18"/><text x="575" y="531" text-anchor="middle">unreachable: error status</text></g>
+<g class="node n-reachable" data-p="f l"><rect x="170" y="576" width="160" height="36" rx="18"/><text x="250" y="599" text-anchor="middle">reachable</text></g>
+<text x="575" y="600" text-anchor="middle" class="t-note">Any network error or timeout: unreachable</text>
+</svg></div></div>
+  </div>
+  <div class="step-grid" style="margin-top:20px">
+    <div class="explain"><p class="muted" style="font-size:14px">An address counts as public only if it isn't in a private, loopback, link-local (which includes the cloud metadata service at 169.254.169.254), carrier-grade NAT, multicast or reserved range. IPv6 addresses that wrap an IPv4 address are unwrapped first. If a host resolves to several addresses, all of them must be public.</p></div>
+    <figure class="code"><figcaption><span class="file">link_checker.py</span><span class="lines">lines 54–66</span></figcaption><pre><code class="language-python">def blocked_reason(url: httpx.URL) -&gt; str | None:
+    &quot;&quot;&quot;Why this URL must not be fetched, or None if it is safe.&quot;&quot;&quot;
+    if url.scheme != &quot;https&quot;:
+        return &quot;Only HTTPS links are checked&quot;
+    if not url.host:
+        return &quot;Link has no host&quot;
+    try:
+        addresses = resolve_host(url.host)
+    except (socket.gaierror, UnicodeError):
+        return UNRESOLVABLE
+    if not addresses or not all(is_public_address(a) for a in addresses):
+        return &quot;Host resolves to a private or reserved network address&quot;
+    return None</code></pre></figure>
+  </div>
+</div></section>
+
+<section class="step" id="step-6"><div class="wrap step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 6 of 8</span><h3>Apply the max-risk rule</h3><span class="where">classification_graph.py · compute_max_risk<br>classifications.py · SECURITY_ORDER</span></div>
+    <p>The core rule of the service is a single <code>max()</code> call. Each level has a rank, from Public (1) to Restricted (4), and the combined data takes the highest rank among the inputs.</p>
+    <p>The ranks come from the order the levels are listed in <code>classifications.py</code>. Changing the scheme means editing that one list.</p>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">classification_graph.py</span><span class="lines">lines 158–164</span></figcaption><pre><code class="language-python">def compute_max_risk(state: ClassificationState) -&gt; ClassificationState:
+    &quot;&quot;&quot;Highest classification among the inputs wins.&quot;&quot;&quot;
+    state.resulting_classification = max(
+        (ds[&quot;SecurityClassification&quot;] for ds in state.datasets),
+        key=SECURITY_ORDER.__getitem__,
+    )
+    return state</code></pre></figure>
+    <div class="facts"><h4>In this request</h4><div class="ladder"><div class="rung rung-public"><div class="rung-head"><span class="rank">rank 1</span><span class="lvl lvl-public">Public</span></div><ul><li class="empty">none</li></ul></div><div class="rung rung-internal"><div class="rung-head"><span class="rank">rank 2</span><span class="lvl lvl-internal">Internal</span></div><ul><li>Store footfall</li></ul></div><div class="rung rung-confidential"><div class="rung-head"><span class="rank">rank 3</span><span class="lvl lvl-confidential">Confidential</span></div><ul><li>Vendor master</li></ul></div><div class="rung win rung-restricted"><div class="rung-head"><span class="rank">rank 4</span><span class="lvl lvl-restricted">Restricted</span></div><ul><li>Loyalty members</li></ul><div class="verdict">highest rank present: result</div></div></div></div>
+  </div>
+</div></section>
+
+<section class="step" id="step-7"><div class="wrap step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 7 of 8</span><h3>Write the audit entry</h3><span class="where">classification_graph.py · write_audit_log<br>audit.py · append_audit_entry</span></div>
+    <p>The full decision is appended to <code>audit_log.jsonl</code> as one line of JSON: the inputs, the validation result, every link check, and the classification. It gets a random unique ID and a UTC timestamp.</p>
+    <p>A lock makes sure two requests finishing at the same moment can't interleave their lines. Because each entry is written as encoded JSON, a dataset name containing a line break can't forge a fake entry.</p>
+    <div class="callout info"><strong>Rejections use the same writer:</strong> <code>audit_rejection</code> calls <code>append_audit_entry</code> with outcome <code>rejected</code>, the stage that refused the request, and the errors.</div>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">audit.py</span><span class="lines">lines 33–44</span></figcaption><pre><code class="language-python">def append_audit_entry(entry: dict[str, Any], log_path: Path | None = None) -&gt; str:
+    &quot;&quot;&quot;Write one entry and return its audit ID.&quot;&quot;&quot;
+    log_path = Path(log_path) if log_path else config.AUDIT_LOG_PATH
+    record = {
+        &quot;audit_log_id&quot;: entry.pop(&quot;audit_log_id&quot;, None) or new_audit_id(),
+        &quot;timestamp&quot;: datetime.now(timezone.utc).isoformat(),
+        **entry,
+    }
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with _lock, log_path.open(&quot;a&quot;, encoding=&quot;utf-8&quot;) as fh:
+        fh.write(json.dumps(record, default=str) + &quot;\n&quot;)
+    return record[&quot;audit_log_id&quot;]</code></pre></figure>
+    <div class="facts"><h4>In this request</h4><dl>
+      <dt>Audit ID</dt><dd><code>audit-6ad99d87-1f4a-4699-980d-6329944dba7b</code></dd>
+      <dt>Timestamp</dt><dd><code>2026-11-07T18:52:27.857791+00:00</code></dd>
+      <dt>Outcome</dt><dd><code>classified</code></dd>
+    </dl></div>
+  </div>
+</div></section>
+
+<section class="step" id="step-8"><div class="wrap step-grid">
+  <div class="explain">
+    <div class="step-head"><span class="step-num">Step 8 of 8</span><h3>Respond</h3><span class="where">classification_graph.py · return_result<br>models.py · ClassificationResponse</span></div>
+    <p>The state is reshaped into the response format and checked one last time against the response model, so the service can't send back something its own contract doesn't allow.</p>
+    <p>The caller gets <code>200</code> with the classification, every link result, and the audit ID it can quote later. The two security headers from step 1 are added on the way out.</p>
+  </div>
+  <div class="evidence">
+    <figure class="code"><figcaption><span class="file">HTTP 200 · application/json</span></figcaption><pre><code class="language-json">{
+  &quot;Datasets&quot;: [
+    {
+      &quot;Name&quot;: &quot;Store footfall&quot;,
+      &quot;Description&quot;: &quot;Aggregated visitor counts by store and hour&quot;,
+      &quot;SecurityClassification&quot;: &quot;Internal&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/footfall&quot;
+    },
+    {
+      &quot;Name&quot;: &quot;Loyalty members&quot;,
+      &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+      &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+    },
+    {
+      &quot;Name&quot;: &quot;Vendor master&quot;,
+      &quot;Description&quot;: &quot;Supplier contacts and payment terms&quot;,
+      &quot;SecurityClassification&quot;: &quot;Confidential&quot;,
+      &quot;PolicyLink&quot;: &quot;https://10.0.0.5/vendor-policy&quot;
+    }
+  ],
+  &quot;ResultingSecurityClassification&quot;: &quot;Restricted&quot;,
+  &quot;AllPolicyLinksReachable&quot;: false,
+  &quot;PolicyChecks&quot;: [
+    {
+      &quot;Name&quot;: &quot;Store footfall&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/footfall&quot;,
+      &quot;Status&quot;: &quot;reachable&quot;,
+      &quot;Reachable&quot;: true,
+      &quot;StatusCode&quot;: 200,
+      &quot;Error&quot;: null
+    },
+    {
+      &quot;Name&quot;: &quot;Loyalty members&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;,
+      &quot;Status&quot;: &quot;reachable&quot;,
+      &quot;Reachable&quot;: true,
+      &quot;StatusCode&quot;: 200,
+      &quot;Error&quot;: null
+    },
+    {
+      &quot;Name&quot;: &quot;Vendor master&quot;,
+      &quot;PolicyLink&quot;: &quot;https://10.0.0.5/vendor-policy&quot;,
+      &quot;Status&quot;: &quot;blocked&quot;,
+      &quot;Reachable&quot;: false,
+      &quot;StatusCode&quot;: null,
+      &quot;Error&quot;: &quot;Host resolves to a private or reserved network address&quot;
+    }
+  ],
+  &quot;AuditLogId&quot;: &quot;audit-6ad99d87-1f4a-4699-980d-6329944dba7b&quot;
+}</code></pre></figure>
+  </div>
+</div></section>
+</main>
+
+<section class="block" aria-labelledby="state-h"><div class="wrap">
+  <h2 id="state-h">How the state builds up</h2>
+  <p class="intro">Each pipeline step adds exactly one key to <code>ClassificationState</code> and leaves the others alone. These are the keys captured after each step in this run; the highlighted cell is what that step added.</p>
+  <div class="scroll-x"><div class="stategrid" role="table" aria-label="Keys in ClassificationState after each step">
+<div class="sg-row sg-head" role="row"><div role="columnheader">State after</div><div role="columnheader"><code>datasets</code></div><div role="columnheader"><code>validation</code></div><div role="columnheader"><code>policy_checks</code></div><div role="columnheader"><code>resulting_classification</code></div><div role="columnheader"><code>audit_log_id</code></div></div>
+<div class="sg-row" role="row"><div role="rowheader"><strong>Start</strong><code>run_classification_graph</code></div><div role="cell" class="new">3 datasets</div><div role="cell" class="none"><span class="sr">not yet set</span></div><div role="cell" class="none"><span class="sr">not yet set</span></div><div role="cell" class="none"><span class="sr">not yet set</span></div><div role="cell" class="none"><span class="sr">not yet set</span></div></div>
+<div class="sg-row" role="row"><div role="rowheader"><strong>After step 4</strong><code>validate_datasets</code></div><div role="cell" class="has">3 datasets</div><div role="cell" class="new">is_valid: true</div><div role="cell" class="none"><span class="sr">not yet set</span></div><div role="cell" class="none"><span class="sr">not yet set</span></div><div role="cell" class="none"><span class="sr">not yet set</span></div></div>
+<div class="sg-row" role="row"><div role="rowheader"><strong>After step 5</strong><code>check_policy_links</code></div><div role="cell" class="has">3 datasets</div><div role="cell" class="has">is_valid: true</div><div role="cell" class="new">all_reachable: false</div><div role="cell" class="none"><span class="sr">not yet set</span></div><div role="cell" class="none"><span class="sr">not yet set</span></div></div>
+<div class="sg-row" role="row"><div role="rowheader"><strong>After step 6</strong><code>compute_max_risk</code></div><div role="cell" class="has">3 datasets</div><div role="cell" class="has">is_valid: true</div><div role="cell" class="has">all_reachable: false</div><div role="cell" class="new">Restricted</div><div role="cell" class="none"><span class="sr">not yet set</span></div></div>
+<div class="sg-row" role="row"><div role="rowheader"><strong>After step 7</strong><code>write_audit_log</code></div><div role="cell" class="has">3 datasets</div><div role="cell" class="has">is_valid: true</div><div role="cell" class="has">all_reachable: false</div><div role="cell" class="has">Restricted</div><div role="cell" class="new">audit-6ad99d87…</div></div>
+</div></div>
+</div></section>
+
+<section class="block" aria-labelledby="rej-h"><div class="wrap">
+  <h2 id="rej-h">When a request is turned away</h2>
+  <p class="intro">The same session sent three bad requests on purpose. These are their real responses.</p>
+  <div class="rejects">
+    <div class="rcard"><span class="rcode">413</span><h3>Body too large</h3><p>A 20 KB description, stopped at step 1 before any parsing.</p><blockquote>Request body too large</blockquote><span class="tag yes">audited · stage api</span></div>
+    <div class="rcard"><span class="rcode">422</span><h3>Invalid input</h3><p>Five datasets instead of at most four, stopped at step 2.</p><blockquote>List should have at most 4 items after validation, not 5</blockquote><span class="tag yes">audited · stage api</span></div>
+    <div class="rcard"><span class="rcode">400</span><h3>Rejected by the pipeline</h3><p>A direct call to the pipeline with a blank description, an unknown level and an FTP link, stopped at step 4. Through the API, step 2 would have caught these first.</p><blockquote>Dataset[0]: Description is required.<br>Dataset[0]: Invalid SecurityClassification &#x27;Secret&#x27;. Allowed: [&#x27;Public&#x27;, &#x27;Internal&#x27;, &#x27;Confidential&#x27;, &#x27;Restricted&#x27;]<br>Dataset[0]: PolicyLink must be a non-empty HTTPS URL.</blockquote><span class="tag yes">audited · stage pipeline</span></div>
+    <div class="rcard"><span class="rcode">500</span><h3>Unexpected error</h3><p>Not triggered in this run. A crash anywhere in the pipeline is logged for the operator and the caller sees only a generic message.</p><blockquote>Internal server error</blockquote><span class="tag">not audited</span></div>
+  </div>
+</div></section>
+
+<section class="block" aria-labelledby="aud-h"><div class="wrap">
+  <h2 id="aud-h">The audit log after this session</h2>
+  <p class="intro">Four requests, four lines: the traced request and the three rejections. Open a line to see the full entry.</p>
+  <details class="aline"><summary><span class="ao ao-classified">classified</span><code class="aid">audit-6ad99d87-1f4a-4699-980d-6329944dba7b</code><span class="asum">classified as <strong>Restricted</strong></span></summary><pre><code class="language-json">{
+  &quot;audit_log_id&quot;: &quot;audit-6ad99d87-1f4a-4699-980d-6329944dba7b&quot;,
+  &quot;timestamp&quot;: &quot;2026-11-07T18:52:27.857791+00:00&quot;,
+  &quot;outcome&quot;: &quot;classified&quot;,
+  &quot;datasets&quot;: [
+    {
+      &quot;Name&quot;: &quot;Store footfall&quot;,
+      &quot;Description&quot;: &quot;Aggregated visitor counts by store and hour&quot;,
+      &quot;SecurityClassification&quot;: &quot;Internal&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/footfall&quot;
+    },
+    {
+      &quot;Name&quot;: &quot;Loyalty members&quot;,
+      &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+      &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+    },
+    {
+      &quot;Name&quot;: &quot;Vendor master&quot;,
+      &quot;Description&quot;: &quot;Supplier contacts and payment terms&quot;,
+      &quot;SecurityClassification&quot;: &quot;Confidential&quot;,
+      &quot;PolicyLink&quot;: &quot;https://10.0.0.5/vendor-policy&quot;
+    }
+  ],
+  &quot;resulting_classification&quot;: &quot;Restricted&quot;,
+  &quot;validation&quot;: {
+    &quot;is_valid&quot;: true,
+    &quot;errors&quot;: []
+  },
+  &quot;policy_checks&quot;: {
+    &quot;all_reachable&quot;: false,
+    &quot;results&quot;: [
+      {
+        &quot;Name&quot;: &quot;Store footfall&quot;,
+        &quot;PolicyLink&quot;: &quot;https://policies.example.com/footfall&quot;,
+        &quot;Status&quot;: &quot;reachable&quot;,
+        &quot;Reachable&quot;: true,
+        &quot;StatusCode&quot;: 200,
+        &quot;Error&quot;: null
+      },
+      {
+        &quot;Name&quot;: &quot;Loyalty members&quot;,
+        &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;,
+        &quot;Status&quot;: &quot;reachable&quot;,
+        &quot;Reachable&quot;: true,
+        &quot;StatusCode&quot;: 200,
+        &quot;Error&quot;: null
+      },
+      {
+        &quot;Name&quot;: &quot;Vendor master&quot;,
+        &quot;PolicyLink&quot;: &quot;https://10.0.0.5/vendor-policy&quot;,
+        &quot;Status&quot;: &quot;blocked&quot;,
+        &quot;Reachable&quot;: false,
+        &quot;StatusCode&quot;: null,
+        &quot;Error&quot;: &quot;Host resolves to a private or reserved network address&quot;
+      }
+    ]
+  }
+}</code></pre></details><details class="aline"><summary><span class="ao ao-rejected">rejected</span><code class="aid">audit-55a764ae-9d4d-453a-91ad-1f063d5d5032</code><span class="asum">rejected at <code>api</code>: List should have at most 4 items after validation, not 5</span></summary><pre><code class="language-json">{
+  &quot;audit_log_id&quot;: &quot;audit-55a764ae-9d4d-453a-91ad-1f063d5d5032&quot;,
+  &quot;timestamp&quot;: &quot;2026-11-07T18:52:27.862056+00:00&quot;,
+  &quot;outcome&quot;: &quot;rejected&quot;,
+  &quot;stage&quot;: &quot;api&quot;,
+  &quot;errors&quot;: [
+    {
+      &quot;type&quot;: &quot;too_long&quot;,
+      &quot;loc&quot;: [
+        &quot;body&quot;,
+        &quot;Datasets&quot;
+      ],
+      &quot;msg&quot;: &quot;List should have at most 4 items after validation, not 5&quot;,
+      &quot;input&quot;: [
+        {
+          &quot;Name&quot;: &quot;D0&quot;,
+          &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+          &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+          &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+        },
+        {
+          &quot;Name&quot;: &quot;D1&quot;,
+          &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+          &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+          &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+        },
+        {
+          &quot;Name&quot;: &quot;D2&quot;,
+          &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+          &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+          &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+        },
+        {
+          &quot;Name&quot;: &quot;D3&quot;,
+          &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+          &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+          &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+        },
+        {
+          &quot;Name&quot;: &quot;D4&quot;,
+          &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+          &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+          &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+        }
+      ],
+      &quot;ctx&quot;: {
+        &quot;field_type&quot;: &quot;List&quot;,
+        &quot;max_length&quot;: 4,
+        &quot;actual_length&quot;: 5
+      }
+    }
+  ],
+  &quot;received&quot;: {
+    &quot;Datasets&quot;: [
+      {
+        &quot;Name&quot;: &quot;D0&quot;,
+        &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+        &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+        &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+      },
+      {
+        &quot;Name&quot;: &quot;D1&quot;,
+        &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+        &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+        &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+      },
+      {
+        &quot;Name&quot;: &quot;D2&quot;,
+        &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+        &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+        &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+      },
+      {
+        &quot;Name&quot;: &quot;D3&quot;,
+        &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+        &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+        &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+      },
+      {
+        &quot;Name&quot;: &quot;D4&quot;,
+        &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+        &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+        &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+      }
+    ]
+  }
+}</code></pre></details><details class="aline"><summary><span class="ao ao-rejected">rejected</span><code class="aid">audit-76ff93ac-356e-4b53-90a1-36bd46789e4b</code><span class="asum">rejected at <code>api</code>: Request body exceeds 16384 bytes</span></summary><pre><code class="language-json">{
+  &quot;audit_log_id&quot;: &quot;audit-76ff93ac-356e-4b53-90a1-36bd46789e4b&quot;,
+  &quot;timestamp&quot;: &quot;2026-11-07T18:52:27.864653+00:00&quot;,
+  &quot;outcome&quot;: &quot;rejected&quot;,
+  &quot;stage&quot;: &quot;api&quot;,
+  &quot;errors&quot;: [
+    &quot;Request body exceeds 16384 bytes&quot;
+  ],
+  &quot;received&quot;: {
+    &quot;body_bytes&quot;: &quot;20325&quot;
+  }
+}</code></pre></details><details class="aline"><summary><span class="ao ao-rejected">rejected</span><code class="aid">audit-8512fd7a-e4e7-420a-b0d2-d4b5b6102c9a</code><span class="asum">rejected at <code>pipeline</code>: Dataset[0]: Description is required.</span></summary><pre><code class="language-json">{
+  &quot;audit_log_id&quot;: &quot;audit-8512fd7a-e4e7-420a-b0d2-d4b5b6102c9a&quot;,
+  &quot;timestamp&quot;: &quot;2026-11-07T18:52:27.865758+00:00&quot;,
+  &quot;outcome&quot;: &quot;rejected&quot;,
+  &quot;stage&quot;: &quot;pipeline&quot;,
+  &quot;errors&quot;: [
+    &quot;Dataset[0]: Description is required.&quot;,
+    &quot;Dataset[0]: Invalid SecurityClassification &#x27;Secret&#x27;. Allowed: [&#x27;Public&#x27;, &#x27;Internal&#x27;, &#x27;Confidential&#x27;, &#x27;Restricted&#x27;]&quot;,
+    &quot;Dataset[0]: PolicyLink must be a non-empty HTTPS URL.&quot;
+  ],
+  &quot;received&quot;: [
+    {
+      &quot;Name&quot;: &quot;A&quot;,
+      &quot;Description&quot;: &quot; &quot;,
+      &quot;SecurityClassification&quot;: &quot;Secret&quot;,
+      &quot;PolicyLink&quot;: &quot;ftp://x&quot;
+    },
+    {
+      &quot;Name&quot;: &quot;Loyalty members&quot;,
+      &quot;Description&quot;: &quot;Customer names, emails and purchase history&quot;,
+      &quot;SecurityClassification&quot;: &quot;Restricted&quot;,
+      &quot;PolicyLink&quot;: &quot;https://policies.example.com/loyalty&quot;
+    }
+  ]
+}</code></pre></details>
+</div></section>
+
+<footer><div class="wrap">
+  <p>How this was traced: the request ran through the real code with each pipeline step wrapped to record the state it returned. The trace ran in an offline workspace, so the two public policy sites (<code>policies.example.com</code> and <code>docs.example.com</code>) had simulated address lookups and HTTP responses. The private address <code>10.0.0.5</code> was checked by the real code, and no request was sent to it.</p>
+</div></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+  try { if (window.hljs) hljs.highlightAll(); } catch (err) {}
+
+  // Which step is on screen: highlight it in the step bar and on the route map.
+  var navLinks = document.querySelectorAll('nav.stepnav a');
+  var stations = document.querySelectorAll('svg.metro .station');
+  function setCurrent(n) {
+    navLinks.forEach(function (a) {
+      if (a.dataset.step === n) {
+        a.setAttribute('aria-current', 'step');
+        var bar = a.closest('ol');
+        if (bar) bar.scrollTo({ left: a.offsetLeft - 16, behavior: 'smooth' });
+      } else a.removeAttribute('aria-current');
+    });
+    stations.forEach(function (s) { s.classList.toggle('current', s.dataset.step === n); });
+  }
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) setCurrent(en.target.id.replace('step-', '')); });
+    }, { rootMargin: '-40% 0px -55% 0px' });
+    document.querySelectorAll('.step').forEach(function (s) { io.observe(s); });
+  }
+
+  // Trace a link's path through the flowchart.
+  var flow = document.querySelector('svg.flow');
+  var buttons = document.querySelectorAll('.trace-btn');
+  function trace(key) {
+    var active = key && !document.querySelector('.trace-btn[data-trace="' + key + '"]').classList.contains('was-on');
+    buttons.forEach(function (b) {
+      var on = active && b.dataset.trace === key;
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.classList.toggle('was-on', on);
+      b.textContent = on ? 'Showing path' : 'Show path';
+      b.closest('.linkcard').classList.toggle('on', on);
+    });
+    flow.classList.toggle('tracing', !!active);
+    flow.querySelectorAll('[data-p]').forEach(function (el) {
+      var keys = (el.getAttribute('data-p') || '').split(' ');
+      el.classList.toggle('on', !!active && keys.indexOf(key) !== -1);
+    });
+  }
+  buttons.forEach(function (b) { b.addEventListener('click', function () { trace(b.dataset.trace); }); });
+  trace('l');
+})();
+</script>
+
+</body>
+</html>
