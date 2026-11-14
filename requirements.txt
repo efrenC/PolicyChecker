@@ -1,6 +1,6 @@
 # Minimum versions are set above releases with known security fixes.
-fastapi>=0.162.0
+fastapi>=0.162.4
 uvicorn>=0.54.0
-pydantic>=2.14.2
+pydantic>=2.14.3
 httpx>=0.28.1
 h11>=0.16  # HTTP parser used by uvicorn/httpx (CVE-2025-43859 fixed in 0.16)
